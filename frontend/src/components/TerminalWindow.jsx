@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
 
+const API_URL = import.meta.env.PROD ? '/api' : 'http://localhost:8000/api';
+
 const COMMANDS = [
     'ls', 'cd', 'pwd', 'cat', 'touch', 'rm', 'mkdir', 'cp', 'mv', 'echo',
     'clear', 'help', 'whoami', 'neofetch', 'scan', 'ping', 'traceroute',
@@ -193,7 +195,7 @@ const TerminalWindow = ({ isOpen, onClose, onCommand, history, setHistory, isDra
             let res;
             if (operation === 'ls') {
                 const target = getTarget();
-                res = await axios.get(`http://localhost:8000/api/files/list?path=${target}`);
+                res = await axios.get(`${API_URL}/files/list?path=${target}`);
                 if (res.data.files) {
                     const fileList = res.data.files.map(f =>
                         `${f.type === 'folder' ? '📁 ' : '📄 '}${f.name}${f.type === 'file' ? ` (${f.size}b)` : ''}`
@@ -208,7 +210,7 @@ const TerminalWindow = ({ isOpen, onClose, onCommand, history, setHistory, isDra
                     return;
                 }
                 const target = getTarget();
-                res = await axios.get(`http://localhost:8000/api/files/list?path=${target}`);
+                res = await axios.get(`${API_URL}/files/list?path=${target}`);
                 if (res.data.error) {
                     throw new Error(`cd: ${args[1]}: No such directory`);
                 } else {
@@ -220,7 +222,7 @@ const TerminalWindow = ({ isOpen, onClose, onCommand, history, setHistory, isDra
             } else if (operation === 'cat') {
                 if (!args[1]) throw new Error('Usage: cat [filename]');
                 const target = resolvePath(args[1]);
-                res = await axios.post('http://localhost:8000/api/files/read', { path: target });
+                res = await axios.post(`${API_URL}/files/read`, { path: target });
                 if (res.data.content !== undefined) {
                     typewriterAppend(res.data.content);
                 } else {
@@ -229,7 +231,7 @@ const TerminalWindow = ({ isOpen, onClose, onCommand, history, setHistory, isDra
             } else if (operation === 'touch') {
                 if (!args[1]) throw new Error('Usage: touch [filename]');
                 const target = resolvePath(args[1]);
-                res = await axios.post('http://localhost:8000/api/files/create', { path: target, type: 'file' });
+                res = await axios.post(`${API_URL}/files/create`, { path: target, type: 'file' });
                 if (res.data.status === 'success') {
                     setHistory(prev => [...prev, { type: 'response', content: `✓ Created: ${target}` }]);
                 } else {
@@ -238,7 +240,7 @@ const TerminalWindow = ({ isOpen, onClose, onCommand, history, setHistory, isDra
             } else if (operation === 'mkdir') {
                 if (!args[1]) throw new Error('Usage: mkdir [foldername]');
                 const target = resolvePath(args[1]);
-                res = await axios.post('http://localhost:8000/api/files/create', { path: target, type: 'folder' });
+                res = await axios.post(`${API_URL}/files/create`, { path: target, type: 'folder' });
                 if (res.data.status === 'success') {
                     setHistory(prev => [...prev, { type: 'response', content: `✓ Created folder: ${target}` }]);
                 } else {
@@ -247,7 +249,7 @@ const TerminalWindow = ({ isOpen, onClose, onCommand, history, setHistory, isDra
             } else if (operation === 'rm') {
                 if (!args[1]) throw new Error('Usage: rm [filename]');
                 const target = resolvePath(args[1]);
-                res = await axios.post('http://localhost:8000/api/files/delete', { path: target });
+                res = await axios.post(`${API_URL}/files/delete`, { path: target });
                 if (res.data.status === 'success') {
                     setHistory(prev => [...prev, { type: 'response', content: `✗ Deleted: ${target}` }]);
                 } else {
@@ -257,7 +259,7 @@ const TerminalWindow = ({ isOpen, onClose, onCommand, history, setHistory, isDra
                 if (args.length < 3) throw new Error('Usage: cp [source] [destination]');
                 const src = resolvePath(args[1]);
                 const dst = resolvePath(args[2]);
-                res = await axios.post('http://localhost:8000/api/files/copy', { path: src, destination: dst });
+                res = await axios.post(`${API_URL}/files/copy`, { path: src, destination: dst });
                 if (res.data.status === 'success') {
                     setHistory(prev => [...prev, { type: 'response', content: `✓ Copied ${src} → ${dst}` }]);
                 } else {
@@ -267,7 +269,7 @@ const TerminalWindow = ({ isOpen, onClose, onCommand, history, setHistory, isDra
                 if (args.length < 3) throw new Error('Usage: mv [source] [destination]');
                 const src = resolvePath(args[1]);
                 const dst = resolvePath(args[2]);
-                res = await axios.post('http://localhost:8000/api/files/move', { path: src, destination: dst });
+                res = await axios.post(`${API_URL}/files/move`, { path: src, destination: dst });
                 if (res.data.status === 'success') {
                     setHistory(prev => [...prev, { type: 'response', content: `✓ Moved ${src} → ${dst}` }]);
                 } else {
@@ -279,7 +281,7 @@ const TerminalWindow = ({ isOpen, onClose, onCommand, history, setHistory, isDra
                 const filename = args[arrowIdx + 1];
                 if (filename) {
                     const target = resolvePath(filename);
-                    res = await axios.post('http://localhost:8000/api/files/write', { path: target, content: text });
+                    res = await axios.post(`${API_URL}/files/write`, { path: target, content: text });
                     if (res.data.status === 'success') {
                         setHistory(prev => [...prev, { type: 'response', content: `✓ Wrote to ${target}` }]);
                     } else {
@@ -339,9 +341,9 @@ const TerminalWindow = ({ isOpen, onClose, onCommand, history, setHistory, isDra
             <div className="flex-1 overflow-y-auto space-y-1 px-3 py-2 scrollbar-hide text-sm">
                 {history.map((line, i) => (
                     <div key={i} className={`leading-relaxed ${line.type === 'error' ? 'text-red-400'
-                            : line.type === 'user' ? 'text-white/90'
-                                : line.type === 'system' ? 'text-amber-400'
-                                    : 'text-cyber-green/90'
+                        : line.type === 'user' ? 'text-white/90'
+                            : line.type === 'system' ? 'text-amber-400'
+                                : 'text-cyber-green/90'
                         }`}>
                         <pre className="whitespace-pre-wrap font-mono text-xs md:text-sm">{line.content}</pre>
                     </div>

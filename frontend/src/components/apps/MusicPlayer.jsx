@@ -12,6 +12,9 @@ const MusicPlayer = ({ onClose, isFocused }) => {
     const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
     const [progress, setProgress] = useState(0);
     const [volume, setVolume] = useState(0.5);
+    const [visualMode, setVisualMode] = useState('BARS'); // BARS or PULSE
+    const [isPeak, setIsPeak] = useState(false);
+
     const audioRef = useRef(null);
     const canvasRef = useRef(null);
     const animationRef = useRef(null);
@@ -45,28 +48,65 @@ const MusicPlayer = ({ onClose, isFocused }) => {
 
             analyserRef.current.getByteFrequencyData(dataArray);
 
+            // Peak detection for pulse effect
+            const average = dataArray.reduce((p, c) => p + c, 0) / bufferLength;
+            if (average > 80) { // Threshold for "peak"
+                setIsPeak(true);
+                setTimeout(() => setIsPeak(false), 50);
+            }
+
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            const barWidth = (canvas.width / bufferLength) * 2.5;
-            let barHeight;
-            let x = 0;
+            if (visualMode === 'BARS') {
+                const barWidth = (canvas.width / bufferLength) * 2.5;
+                let barHeight;
+                let x = 0;
 
-            for (let i = 0; i < bufferLength; i++) {
-                barHeight = (dataArray[i] / 255) * canvas.height;
+                for (let i = 0; i < bufferLength; i++) {
+                    barHeight = (dataArray[i] / 255) * canvas.height;
+                    const r = 0;
+                    const g = 255;
+                    const b = 65;
 
-                // Cyberpunk colors (matrix green / synthwave purple)
-                const r = 0;
-                const g = 255;
-                const b = 65;
+                    ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${dataArray[i] / 255})`;
+                    ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+                    ctx.shadowBlur = 10;
+                    ctx.shadowColor = `rgba(0, 255, 65, 0.5)`;
+                    x += barWidth + 1;
+                }
+            } else {
+                // PULSE / CIRCLE MODE
+                const centerX = canvas.width / 2;
+                const centerY = canvas.height / 2;
+                const radius = 40 + (average / 2);
 
-                ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${dataArray[i] / 255})`;
-                ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+                ctx.strokeStyle = '#00ff41';
+                ctx.lineWidth = 2;
+                ctx.stroke();
 
-                // Glow effect
-                ctx.shadowBlur = 10;
-                ctx.shadowColor = `rgba(0, 255, 65, 0.5)`;
+                // Inner pulsing glow
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, radius * 0.8, 0, 2 * Math.PI);
+                ctx.fillStyle = `rgba(0, 255, 65, ${average / 400})`;
+                ctx.fill();
 
-                x += barWidth + 1;
+                // Particle rings
+                for (let i = 0; i < bufferLength; i += 8) {
+                    const angle = (i / bufferLength) * Math.PI * 2;
+                    const h = (dataArray[i] / 255) * 30;
+                    const x1 = centerX + Math.cos(angle) * radius;
+                    const y1 = centerY + Math.sin(angle) * radius;
+                    const x2 = centerX + Math.cos(angle) * (radius + h);
+                    const y2 = centerY + Math.sin(angle) * (radius + h);
+
+                    ctx.beginPath();
+                    ctx.moveTo(x1, y1);
+                    ctx.lineTo(x2, y2);
+                    ctx.strokeStyle = `rgba(0, 255, 65, ${dataArray[i] / 255})`;
+                    ctx.stroke();
+                }
             }
 
             animationRef.current = requestAnimationFrame(draw);
@@ -83,7 +123,7 @@ const MusicPlayer = ({ onClose, isFocused }) => {
         }
 
         return () => cancelAnimationFrame(animationRef.current);
-    }, [isPlaying]);
+    }, [isPlaying, visualMode]);
 
     useEffect(() => {
         if (audioRef.current) {
@@ -117,15 +157,23 @@ const MusicPlayer = ({ onClose, isFocused }) => {
     };
 
     return (
-        <div className={`w-full h-full bg-black border-2 flex flex-col font-mono text-xs select-none transition-all ${isFocused ? 'border-cyber-green shadow-[0_0_20px_rgba(0,255,65,0.2)]' : 'border-cyber-green/30'}`}>
+        <div className={`w-full h-full bg-black border-2 flex flex-col font-mono text-xs select-none transition-all ${isFocused ? 'border-cyber-green shadow-[0_0_20px_rgba(0,255,65,0.2)]' : 'border-cyber-green/30'} ${isPeak ? 'translate-y-0.5' : ''}`}>
             {/* Header */}
             <div className={`flex justify-between items-center p-1 px-2 border-b ${isFocused ? 'bg-cyber-green text-black' : 'bg-gray-900 text-cyber-green/50 border-cyber-green/30'}`}>
-                <span className="font-bold text-sm">CYBER_AUDIO_v1.0</span>
-                <button onClick={onClose} className="hover:bg-black hover:text-cyber-green px-1">[X]</button>
+                <span className="font-bold text-sm">CYBER_AUDIO_v1.1</span>
+                <div className="flex gap-2">
+                    <button
+                        onClick={() => setVisualMode(visualMode === 'BARS' ? 'PULSE' : 'BARS')}
+                        className="hover:bg-black hover:text-cyber-green px-1 border border-black/20"
+                    >
+                        [{visualMode}]
+                    </button>
+                    <button onClick={onClose} className="hover:bg-black hover:text-cyber-green px-1">[X]</button>
+                </div>
             </div>
 
             {/* Visualizer Area */}
-            <div className="flex-1 relative overflow-hidden bg-black/40">
+            <div className={`flex-1 relative overflow-hidden bg-black/40 ${isPeak ? 'brightness-125' : ''}`}>
                 <canvas ref={canvasRef} className="w-full h-full" width={400} height={200} />
                 {!isPlaying && (
                     <div className="absolute inset-0 flex items-center justify-center bg-black/60">

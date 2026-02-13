@@ -204,7 +204,8 @@ const DesktopEnvironment = () => {
         if (cmd === 'lock') { setIsLocked(true); return { type: 'text', content: 'SCREEN LOCKED.' }; }
 
         try {
-            const res = await axios.post('http://localhost:8000/api/terminal/command', { command: cmd });
+            const API_URL = import.meta.env.PROD ? '/api' : 'http://localhost:8000/api';
+            const res = await axios.post(API_URL + '/terminal/command', { command: cmd });
             return res.data;
         } catch (error) {
             return { type: 'error', content: '⚠ CONNECTION_REFUSED: Backend offline' };

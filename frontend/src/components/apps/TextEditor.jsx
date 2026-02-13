@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
+const API_URL = import.meta.env.PROD ? '/api' : 'http://localhost:8000/api';
+
 const TextEditor = ({ fileName, content: initialContent, onClose, isFocused }) => {
     const [text, setText] = useState(initialContent || "");
     const [status, setStatus] = useState(initialContent ? "LOADED" : "LOADING...");
@@ -22,7 +24,7 @@ const TextEditor = ({ fileName, content: initialContent, onClose, isFocused }) =
             // Determine path - simplistic logic for now
             // If it came from file explorer, fileName might be a path?
             // For MVP let's assume all edited files are relative to root or we use the passed content
-            const res = await axios.post('http://localhost:8000/api/files/read', { path: fileName });
+            const res = await axios.post(`${API_URL}/files/read`, { path: fileName });
             if (res.data.content !== undefined) {
                 setText(res.data.content);
                 setStatus("READY");
@@ -37,7 +39,7 @@ const TextEditor = ({ fileName, content: initialContent, onClose, isFocused }) =
     const handleSave = async () => {
         setStatus("SAVING...");
         try {
-            const res = await axios.post('http://localhost:8000/api/files/write', {
+            const res = await axios.post(`${API_URL}/files/write`, {
                 path: fileName,
                 content: text
             });
